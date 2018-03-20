@@ -1,13 +1,13 @@
 Avivo Demographics Markdown File
 =====================================
 
-The purpose of this is provide some basic demographic data that was presented to Avivo on March 12,2018.
+The purpose of this is provide some basic demographic data that was presented to Avivo on March 12,2018 and incorporates the changes, most notably a distinict 18 to 26 age group, from that meeting
 
 The sources are the custom made demographics data and the discharge portion of the Daanes file.  
-
 For the demographics data, I calculated age at time of the discharge.  For race, I broke out the original race column and created 4 separate columns to make the data tidy (one variable per column).  Please not that these are the number of unique patients as identified by Client.Number.  Because there are clients with multiple visits, the number of patients is smaller than the number of visits.
 
 Contents include:
+
 * Previewing the data
 
 * Counts by sex, primary race (race), and age grouping (age)
@@ -18,6 +18,8 @@ Contents include:
 
 * Highest success rate by age/sex, race/sex, age/race
 
+* Success rate by all 3 demographic categories
+
 
 
 Accessing and setting up the data:
@@ -25,8 +27,54 @@ Accessing and setting up the data:
 ```r
 demo <- read.csv("AvivoDemographicTablev3.csv",header = TRUE, sep=",")
 library(data.table)
+```
+
+```
+## data.table 1.10.4.3
+```
+
+```
+##   The fastest way to learn (by data.table authors): https://www.datacamp.com/courses/data-analysis-the-data-table-way
+```
+
+```
+##   Documentation: ?data.table, example(data.table) and browseVignettes("data.table")
+```
+
+```
+##   Release notes, videos and slides: http://r-datatable.com
+```
+
+```r
 library(dplyr)
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:data.table':
+## 
+##     between, first, last
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
 library(ggplot2)
+library(stringr)
 opts_knit$set()
 ```
 
@@ -137,15 +185,15 @@ ggplot(data=demo, aes(x=Race1)) +
 Because race for demographic purposes is calculated by primary race, I broke the primary race by the first value in the race column from the Daanes file.  African-Americans make up roughly half of the non-NA population, followed by patients who are White and then Native Americans.  Hispanic or Latino and Asians appear in very small numbers.
 
 
-For the age grouping, I grouped or cut the age by decade.  This was done by changing the factor for age to numeric and using arbitrary cut points, but generally by decade.
+For the age grouping, I changed the age grouping to include 18 and 26 and then segmenting the other age groups by 10 year intervals until reaching age 57.  Note age is as of the discharge date.  This was done by changing the factor for age to numeric and using arbitrary cut points, but generally by decade.
 
 
 ```r
-demo[3] <- lapply(demo[3], as.numeric)
+demo[4] <- lapply(demo[4], as.numeric)
 
 demo$Age_group <- cut(demo$Age,
-           breaks = c(-Inf, 30, 40, 50, 60, Inf),
-           labels = c("Under 30", "30 to 39", "40 to 49", "50 to 59", "60+"),
+           breaks = c(-Inf, 27, 37, 47, 57, Inf),
+           labels = c("18 to 26", "27 to 36", "37 to 46", "47 to 56", "57+"),
            right = FALSE)
 ```
 
@@ -166,7 +214,7 @@ The majority of the patients are between 18 and 49 years old.  There is a drop i
 
 **Count by 2 Variable Graphs**
 
-With the 2 variable graphs, I need to explain how to read.  The y-axis value are represented by the height of the bar.  That was done to show scale.  The value is the percentage within the x-axis variable.
+With the 2 variable graphs, I need to explain how to read the graphs.  The y-axis values are represented by the height of the bar.  That was done to show scale.  The value is the percentage within the x-axis variable.
 
 
 Dataframe establishing count by age and sex:
@@ -191,7 +239,8 @@ ggplot(data=agesex, aes(x=Age_group, y=counts, fill=Sex))+
 
 ![plot of chunk age_sex_graph](figure/age_sex_graph-1.png)
 
-Note that the younger patients skew more female while older patients skew more male.
+Almost 60% of the clients aged 18 to 36 are female, it is even distribution from 37 to 46, and roughly 70% of the clients aged 47+ are male.  In conclusion, there is a shift from female to male as the clientele is older.
+
 
 dataframe establishing count by primary race and sex:
 
@@ -203,11 +252,9 @@ primaryrace_sex <- demo %>%
 ```
 
 Percent by age and sex graph:
-Note: stringr library enabled so x data labels can wrap
 
 
 ```r
-library(stringr)
 ggplot(data=primaryrace_sex, aes(x=Race1, y=counts, fill=Sex))+
     geom_bar(stat="identity",position = 'dodge') +
     geom_text(aes(label=percent_total),color='black',position = position_dodge(width = 1), vjust = -0.5, size = 3) +
@@ -220,11 +267,13 @@ ggplot(data=primaryrace_sex, aes(x=Race1, y=counts, fill=Sex))+
 
 Almost 2/3 of the African-American patients are male, while over 80% of the Native American patients are female.
 
+
 Dataframe establishing count by primary race and age group:
 
 ```r
 primaryrace_agegroup <- demo %>%
-group_by(Race1,Age_group) %>%
+  group_by(Race1,Age_group) %>%
+  filter(Race1 %in% c("American Indian or Alaska Native","Black or African American","White")) %>%
   summarize(counts = n()) %>%
   mutate(percent_total = round(counts / sum(counts) * 100,1))
 ```
@@ -235,7 +284,7 @@ Percent by race and age graph
 ```r
 ggplot(data=primaryrace_agegroup, aes(x=Race1, y=counts, fill=Age_group))+
   geom_bar(stat="identity",position = 'dodge') +
-  geom_text(aes(label=percent_total),color='black',position = position_dodge(width = 1), vjust = -0.5, size = 2) +
+  geom_text(aes(label=percent_total),color='black',position = position_dodge(width = 1), vjust = -0.5, size = 3) +
   ggtitle("Percent of Avivo Clients per Primary Race by Age Group")+
   xlab("Age Grouping") + ylab("Counts") + 
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
@@ -243,7 +292,7 @@ ggplot(data=primaryrace_agegroup, aes(x=Race1, y=counts, fill=Age_group))+
 
 ![plot of chunk race_age_graph](figure/race_age_graph-1.png)
 
-What this shows is that American American patient shew older and Native American and White patient skew younger.
+Given that there were 3 main primary races in the population, the data has been filtered to American Indian or Alaska Native, African-American and White.  The age distribution for American Indian and White show that over 50% of the clients are under age 37 while for African-Americans, 65% of the clients are aged 37 and over.
 
 **Success by single demographic variable graphs**
 
@@ -266,7 +315,6 @@ avivo_disc_demo$Completed_Program <- ifelse (avivo_disc_demo$Reason.for.Discharg
 avivo_disc_demo$Completed_Program <- as.factor(avivo_disc_demo$Completed_Program)
 ```
 
-Thank you Abhishek.
 
 Dataframe establishing success rate by sex (gender)
 
@@ -294,12 +342,13 @@ ggplot(data = df_success_sex, aes(x = Sex.y, y = counts, fill = Completed_Progra
 
 Females have a higher success rate than males.  Note that the NA success rate is higher than both.
 
-Dataframe establishing success rate by primary race:
+Dataframe establishing success rate by primary race.  It is filtered by the three primary races.
 
 
 ```r
 df_success_race<- avivo_disc_demo %>%
   group_by(Race1, Completed_Program) %>%
+  filter(Race1 %in% c("American Indian or Alaska Native","Black or African American","White")) %>%
   summarize(counts = n()) %>% 
   mutate(percent_total = round(counts / sum(counts) * 100,1))
 ```
@@ -344,7 +393,7 @@ ggplot(data = df_success_age, aes(x = Age_group, y = counts, fill = Completed_Pr
 
 ![plot of chunk success_age_graph](figure/success_age_graph-1.png)
 
-The success rate is higher as the age increases, except for 60+ aged clients.
+Basically, the older the client, the more likely the client will succeed with a noticeable jump starting at age 47.
 
 **Success by 2 demographic variables graphs**
 
@@ -381,9 +430,9 @@ ggplot(data = df_success_agesex_comp, aes(reorder(x = agesex,percent_total), y =
 
 ![plot of chunk success_age_sex_graph](figure/success_age_sex_graph-1.png)
 
-Generally what is shows is that older patients are doing better.  Younger and male appears to have the least likelihood of succeeding.
+Generally what is shows is that older patients are doing better.  Male patients aged 18 to 26, 27 to 36, and 37 to 46 comprise of the bottom 3 groups. 
 
-Dataframes establishing success rate by primary race and sex.  Note that I filtered on the 3 primary races.
+Dataframes establishing success rate by primary race and sex.  
 
 ```r
 df_success_racesex <- avivo_disc_demo %>%
@@ -447,9 +496,42 @@ ggplot(data = df_success_raceage_comp, aes(reorder(x = raceage,percent_total), y
 
 ![plot of chunk success_race_age_graph](figure/success_race_age_graph-1.png)
 
-After the presentation with Avivo, the next steps are to break down the age groups starting with 18 to 26 and then figuring out the other age groups and to analyze 3 factor groupings.  An example would be African American, Female, and Under 30.
+**Success by all demographic variables graph**
 
+Using all 3 demographic categories but filtering by the 3 primary races and excluding the aged 57+ clientele, and finally setting the number of completed patients by 15+.
 
+```r
+df_success_all <- avivo_disc_demo %>%
+  group_by(Race1, Sex.y, Age_group, Completed_Program) %>%
+  filter(Race1 %in% c("American Indian or Alaska Native","Black or African American","White"),
+         Age_group %in% c("18 to 26","27 to 36","37 to 46","47 to 56")) %>%
+  summarize(counts = n()) %>% 
+  mutate(percent_total = round(counts / sum(counts) * 100,1))
+
+df_success_all$all <- paste(df_success_all$Race1,df_success_all$Sex.y ,df_success_all$Age_group, sep="_")
+
+df_success_all_comp <- subset(df_success_all, Completed_Program == 1)
+
+counts_not_small <- df_success_all_comp$counts > 14
+
+df_success_all_comp_not_small <- df_success_all_comp[counts_not_small,]
+```
+
+Success rate by all 3 demographic categories but only showing the success rate and ranked:
+
+```r
+ggplot(data = df_success_all_comp_not_small, aes(reorder(x = all, percent_total), y = percent_total, fill = percent_total))+ 
+  geom_bar(position = "dodge", stat = "identity") + 
+  geom_text(aes(label=percent_total),color='black',position = position_dodge(width = 1), hjust = 0, size = 2) +
+  xlab("Primary Race / Age") + ylab("Percent") +
+  ggtitle("Success Rate by all Factors, Completed Clients >= 15") + 
+  coord_flip() +
+  theme(axis.text=element_text(size=6))
+```
+
+![plot of chunk success_all_graph](figure/success_all_graph-1.png)
+
+First, the age/gender/race categories where the number of completed clients below 15 were omitted.  There is one population that doesn't fit the overall story, which is that the younger age groups, 18 to 26 and 27 to 36, has the lowest success rate.  The African-American female population in those age groups has success rates of 53.3% (24 out of 45) and 48.9% (44 out of 90), which are both above average.  Are possible factors, the type of program or the possibility of the impact of children?
 
 
 
